@@ -18,7 +18,7 @@ pub extern "C" fn _start() -> ! {
 
     b(&mut printer);
 
-    serial_print!(printer, "test");
+    serial_println!(printer, "test");
 
     loop {}
 }
@@ -30,9 +30,16 @@ macro_rules! serial_print {
         $printer._print(format_args!($($arg)*));
     };
 }
+/// Prints to the host through the serial interface, appending a newline.
+#[macro_export]
+macro_rules! serial_println {
+    ($printer:expr) => ($crate::serial_print!($printer, "\n"));
+    ($printer:expr, $fmt:expr) => ($crate::serial_print!($printer, concat!($fmt, "\n")));
+    ($printer:expr, $fmt:expr, $($arg:tt)*) => ($crate::serial_print!($printer, concat!($fmt, "\n"), $($arg)*));
+}
 
 fn b(printer: &mut DebugPrinter) {
-    serial_print!(printer, "test");
+    serial_println!(printer, "test");
 }
 
 struct DebugPrinter {
