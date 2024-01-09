@@ -15,18 +15,24 @@ pub extern "C" fn _start() -> ! {
     serial_port.init();
     // TODO: I left out Mutex here for now
     let mut printer = DebugPrinter::new(serial_port);
-    
-    /// Prints to the host through the serial interface.
-    #[macro_export]
-    macro_rules! serial_print {
-        ($($arg:tt)*) => {
-            printer._print(format_args!($($arg)*));
-        };
-    }
 
-    serial_print!("test");
+    b(&mut printer);
+
+    serial_print!(printer, "test");
 
     loop {}
+}
+
+/// Prints to the host through the serial interface.
+#[macro_export]
+macro_rules! serial_print {
+    ($printer:expr, $($arg:tt)*) => {
+        $printer._print(format_args!($($arg)*));
+    };
+}
+
+fn b(printer: &mut DebugPrinter) {
+    serial_print!(printer, "test");
 }
 
 struct DebugPrinter {
