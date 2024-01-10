@@ -1,9 +1,12 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
 
+use spin::Mutex;
 use uart_16550::SerialPort;
+use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -19,8 +22,31 @@ pub extern "C" fn _start() -> ! {
     b(&mut printer);
 
     serial_println!(printer, "test");
+ 
+    // - needs to be static because of .load, to be safe
+    // - putting it in a Mutex did not change that, .lock leads to a borrow checker error or it not being static
+    // - this means TODO: we have to use static, but maybe we could put all globals in one place, or just get on with life
+    static mut IDT: Mutex<InterruptDescriptorTable> = Mutex::new(InterruptDescriptorTable::new());
+    {
+        let idt_lock = unsafe { IDT.get_mut() };
+        idt_lock.breakpoint.set_handler_fn(breakpoint_handler);
+        idt_lock.load();
+    }
+    
+    // trigger breakpoint
+    x86_64::instructions::interrupts::int3();
 
-    loop {}
+    serial_println!(printer, "Breakpoint: {:#?}", *BREAKPOINT_OUT.lock());
+
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+static BREAKPOINT_OUT: Mutex<Option<InterruptStackFrame>> = Mutex::new(None);
+
+extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
+    *BREAKPOINT_OUT.lock() = Some(stack_frame);
 }
 
 /// Prints to the host through the serial interface.
